@@ -73,6 +73,7 @@ func runScan(ctx context.Context) error {
 	
 	// Initialize scanner
 	networkScanner := scanner.NewNetworkScanner(awsClient)
+	networkScanner.SetVerbose(verbose)
 	
 	// Scan network infrastructure
 	network, err := networkScanner.ScanNetwork(ctx, vpcID)
