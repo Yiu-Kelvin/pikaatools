@@ -4,8 +4,9 @@ A Go-based tool that scans your AWS network infrastructure and visualizes it as 
 
 ## Features
 
-- 🔍 **Comprehensive Scanning**: Discovers VPCs, subnets, peering connections, Transit Gateways, route tables, and more
+- 🔍 **Comprehensive Scanning**: Discovers VPCs, subnets, peering connections, Transit Gateways, route tables, security groups, and more
 - 📊 **Graph Visualization**: Generates text-based network topology graphs
+- 💾 **JSON Export**: Save complete working state to JSON file for analysis and automation
 - 🔧 **Configurable**: Support for multiple AWS profiles and regions
 - 🚀 **Fast**: Concurrent scanning for efficient discovery
 - 🔒 **Secure**: Uses standard AWS credential chain
@@ -43,6 +44,12 @@ go build -o pikaatools .
 
 # Scan specific VPC
 ./pikaatools scan --vpc-id vpc-12345678
+
+# Export working state to JSON file
+./pikaatools scan --export-json my_network.json
+
+# Save working state to default file (working_state.json)
+./pikaatools scan --save-state
 ```
 
 ### Configuration
@@ -101,6 +108,23 @@ Generate Graphviz DOT files for advanced visualization:
 ```bash
 ./pikaatools scan --output dot > network.dot
 dot -Tpng network.dot -o network.png
+```
+
+### JSON Format
+Export complete network state for analysis, automation, or integration:
+
+```bash
+./pikaatools scan --save-state
+```
+
+This creates a `working_state.json` file containing all discovered resources with their complete configurations including:
+- VPCs with CIDR blocks, tags, and associated resources
+- Subnets with availability zones, route tables, and types (public/private/isolated)
+- Security groups with rules and associations
+- Route tables with all routes and associations
+- Transit Gateways with attachments
+- Internet Gateways and NAT Gateways
+- VPC Peering connections
 ```
 
 ## Contributing
