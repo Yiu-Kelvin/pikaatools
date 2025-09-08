@@ -1,0 +1,131 @@
+package scanner
+
+import (
+	"time"
+)
+
+// Network represents the complete AWS network infrastructure
+type Network struct {
+	VPCs                []VPC                 `json:"vpcs"`
+	Subnets             []Subnet              `json:"subnets"`
+	PeeringConnections  []PeeringConnection   `json:"peering_connections"`
+	TransitGateways     []TransitGateway      `json:"transit_gateways"`
+	InternetGateways    []InternetGateway     `json:"internet_gateways"`
+	NATGateways         []NATGateway          `json:"nat_gateways"`
+	RouteTables         []RouteTable          `json:"route_tables"`
+	SecurityGroups      []SecurityGroup       `json:"security_groups"`
+	ScanTime            time.Time             `json:"scan_time"`
+	Region              string                `json:"region"`
+}
+
+// VPC represents an AWS VPC
+type VPC struct {
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	CidrBlock         string            `json:"cidr_block"`
+	State             string            `json:"state"`
+	IsDefault         bool              `json:"is_default"`
+	DhcpOptionsID     string            `json:"dhcp_options_id"`
+	Tags              map[string]string `json:"tags"`
+	Subnets           []string          `json:"subnets"`           // Subnet IDs
+	SecurityGroups    []string          `json:"security_groups"`    // Security Group IDs
+	InternetGateways  []string          `json:"internet_gateways"`  // Internet Gateway IDs
+	NATGateways       []string          `json:"nat_gateways"`       // NAT Gateway IDs
+}
+
+// Subnet represents an AWS subnet
+type Subnet struct {
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	VpcID             string            `json:"vpc_id"`
+	CidrBlock         string            `json:"cidr_block"`
+	AvailabilityZone  string            `json:"availability_zone"`
+	State             string            `json:"state"`
+	MapPublicIP       bool              `json:"map_public_ip"`
+	Tags              map[string]string `json:"tags"`
+	RouteTableID      string            `json:"route_table_id"`
+	Type              string            `json:"type"` // "public", "private", "isolated"
+}
+
+// PeeringConnection represents a VPC peering connection
+type PeeringConnection struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	RequesterVpcID   string            `json:"requester_vpc_id"`
+	AccepterVpcID    string            `json:"accepter_vpc_id"`
+	Status           string            `json:"status"`
+	Tags             map[string]string `json:"tags"`
+}
+
+// TransitGateway represents an AWS Transit Gateway
+type TransitGateway struct {
+	ID          string                     `json:"id"`
+	Name        string                     `json:"name"`
+	State       string                     `json:"state"`
+	Tags        map[string]string          `json:"tags"`
+	Attachments []TransitGatewayAttachment `json:"attachments"`
+}
+
+// TransitGatewayAttachment represents a TGW attachment
+type TransitGatewayAttachment struct {
+	ID                 string            `json:"id"`
+	TransitGatewayID   string            `json:"transit_gateway_id"`
+	ResourceID         string            `json:"resource_id"`
+	ResourceType       string            `json:"resource_type"`
+	State              string            `json:"state"`
+	Tags               map[string]string `json:"tags"`
+}
+
+// InternetGateway represents an AWS Internet Gateway
+type InternetGateway struct {
+	ID    string            `json:"id"`
+	Name  string            `json:"name"`
+	VpcID string            `json:"vpc_id"`
+	State string            `json:"state"`
+	Tags  map[string]string `json:"tags"`
+}
+
+// NATGateway represents an AWS NAT Gateway
+type NATGateway struct {
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	VpcID            string            `json:"vpc_id"`
+	SubnetID         string            `json:"subnet_id"`
+	State            string            `json:"state"`
+	PublicIP         string            `json:"public_ip"`
+	PrivateIP        string            `json:"private_ip"`
+	ConnectivityType string            `json:"connectivity_type"`
+	Tags             map[string]string `json:"tags"`
+}
+
+// RouteTable represents an AWS route table
+type RouteTable struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	VpcID        string            `json:"vpc_id"`
+	IsMain       bool              `json:"is_main"`
+	Tags         map[string]string `json:"tags"`
+	Routes       []Route           `json:"routes"`
+	Associations []string          `json:"associations"` // Subnet IDs
+}
+
+// Route represents a route in a route table
+type Route struct {
+	DestinationCidr    string `json:"destination_cidr"`
+	GatewayID          string `json:"gateway_id"`
+	InstanceID         string `json:"instance_id"`
+	NetworkInterfaceID string `json:"network_interface_id"`
+	VpcPeeringID       string `json:"vpc_peering_id"`
+	TransitGatewayID   string `json:"transit_gateway_id"`
+	State              string `json:"state"`
+	Origin             string `json:"origin"`
+}
+
+// SecurityGroup represents an AWS security group
+type SecurityGroup struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	VpcID       string            `json:"vpc_id"`
+	Tags        map[string]string `json:"tags"`
+}
