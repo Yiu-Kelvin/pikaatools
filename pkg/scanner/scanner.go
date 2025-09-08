@@ -85,6 +85,13 @@ func (s *NetworkScanner) ScanNetwork(ctx context.Context, vpcID string) (*Networ
 	}
 	network.RouteTables = routeTables
 
+	// Scan security groups
+	securityGroups, err := s.scanSecurityGroups(ctx, vpcIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan security groups: %w", err)
+	}
+	network.SecurityGroups = securityGroups
+
 	// Update subnet types based on route tables
 	s.updateSubnetTypes(network)
 
@@ -491,6 +498,42 @@ func (s *NetworkScanner) scanRouteTables(ctx context.Context, vpcIDs []string) (
 	return routeTables, nil
 }
 
+// scanSecurityGroups scans security groups
+func (s *NetworkScanner) scanSecurityGroups(ctx context.Context, vpcIDs []string) ([]SecurityGroup, error) {
+	if len(vpcIDs) == 0 {
+		return []SecurityGroup{}, nil
+	}
+
+	input := &ec2.DescribeSecurityGroupsInput{
+		Filters: []types.Filter{
+			{
+				Name:   &[]string{"vpc-id"}[0],
+				Values: vpcIDs,
+			},
+		},
+	}
+
+	result, err := s.client.EC2.DescribeSecurityGroups(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var securityGroups []SecurityGroup
+	for _, sg := range result.SecurityGroups {
+		s := SecurityGroup{
+			ID:          *sg.GroupId,
+			Name:        *sg.GroupName,
+			Description: *sg.Description,
+			VpcID:       *sg.VpcId,
+			Tags:        convertTags(sg.Tags),
+		}
+		
+		securityGroups = append(securityGroups, s)
+	}
+
+	return securityGroups, nil
+}
+
 // updateSubnetTypes determines subnet types based on route tables
 func (s *NetworkScanner) updateSubnetTypes(network *Network) {
 	// Create a map of route table ID to route table
@@ -594,6 +637,13 @@ func (s *NetworkScanner) updateVPCAssociations(network *Network) {
 	for _, nat := range network.NATGateways {
 		if vpc, exists := vpcMap[nat.VpcID]; exists {
 			vpc.NATGateways = append(vpc.NATGateways, nat.ID)
+		}
+	}
+	
+	// Associate security groups with VPCs
+	for _, sg := range network.SecurityGroups {
+		if vpc, exists := vpcMap[sg.VpcID]; exists {
+			vpc.SecurityGroups = append(vpc.SecurityGroups, sg.ID)
 		}
 	}
 }
