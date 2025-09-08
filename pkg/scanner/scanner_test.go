@@ -97,3 +97,40 @@ func TestNetworkStructure(t *testing.T) {
 		t.Errorf("Expected region us-east-1, got %s", network.Region)
 	}
 }
+
+func TestIAMStructure(t *testing.T) {
+	// Test IAM role structure
+	role := IAMRole{
+		ID:                   "AROA123456789",
+		Name:                 "test-role",
+		Path:                 "/",
+		Arn:                  "arn:aws:iam::123456789012:role/test-role",
+		Description:          "Test role",
+		CreateDate:           time.Now(),
+		AssumeRolePolicyDocument: `{"Version":"2012-10-17","Statement":[]}`,
+		MaxSessionDuration:   3600,
+		Tags:                 map[string]string{"Environment": "test"},
+		AttachedPolicies:     []IAMPolicy{},
+		InlinePolicies:       []IAMInlinePolicy{},
+	}
+	
+	if role.Name != "test-role" {
+		t.Errorf("Expected role name 'test-role', got %s", role.Name)
+	}
+	
+	if role.MaxSessionDuration != 3600 {
+		t.Errorf("Expected max session duration 3600, got %d", role.MaxSessionDuration)
+	}
+	
+	if role.Tags["Environment"] != "test" {
+		t.Error("Expected Environment tag to be 'test'")
+	}
+}
+
+func TestConvertIAMTags(t *testing.T) {
+	// Test convertIAMTags function
+	tags := convertIAMTags(nil)
+	if len(tags) != 0 {
+		t.Errorf("Expected empty tags map, got %d items", len(tags))
+	}
+}

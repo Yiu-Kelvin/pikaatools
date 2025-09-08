@@ -4,7 +4,7 @@ A Go-based tool that scans your AWS network infrastructure and visualizes it as 
 
 ## Features
 
-- 🔍 **Comprehensive Scanning**: Discovers VPCs, subnets, peering connections, Transit Gateways, route tables, security groups, and more
+- 🔍 **Comprehensive Scanning**: Discovers VPCs, subnets, peering connections, Transit Gateways, route tables, security groups, IAM roles and policies, and more
 - 📊 **Graph Visualization**: Generates text-based network topology graphs
 - 💾 **JSON Export**: Save complete working state to JSON file for analysis and automation
 - 🔧 **Configurable**: Support for multiple AWS profiles and regions
@@ -80,7 +80,14 @@ The tool requires the following AWS permissions:
                 "ec2:DescribeInternetGateways",
                 "ec2:DescribeNatGateways",
                 "ec2:DescribeSecurityGroups",
-                "ec2:DescribeNetworkAcls"
+                "ec2:DescribeNetworkAcls",
+                "iam:ListRoles",
+                "iam:GetRole",
+                "iam:ListAttachedRolePolicies",
+                "iam:ListRolePolicies",
+                "iam:GetRolePolicy",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion"
             ],
             "Resource": "*"
         }
@@ -125,6 +132,7 @@ This creates a `working_state.json` file containing all discovered resources wit
 - Transit Gateways with attachments
 - Internet Gateways and NAT Gateways
 - VPC Peering connections
+- IAM roles with attached and inline policies
 ```
 
 ## Contributing

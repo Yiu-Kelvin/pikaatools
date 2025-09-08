@@ -7,11 +7,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 // Client wraps AWS services needed for network scanning
 type Client struct {
 	EC2    *ec2.Client
+	IAM    *iam.Client
 	config aws.Config
 }
 
@@ -41,6 +43,7 @@ func NewClient(ctx context.Context, region, profile string) (*Client, error) {
 	
 	return &Client{
 		EC2:    ec2.NewFromConfig(cfg),
+		IAM:    iam.NewFromConfig(cfg),
 		config: cfg,
 	}, nil
 }

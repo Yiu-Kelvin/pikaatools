@@ -27,14 +27,14 @@ var rootCmd = &cobra.Command{
 	Short: "AWS Network Scanner and Visualizer",
 	Long: `PikaaTools is a comprehensive AWS network scanner that discovers and visualizes 
 your AWS network infrastructure including VPCs, subnets, peering connections, 
-Transit Gateways, and other network resources.`,
+Transit Gateways, IAM roles and policies, and other network resources.`,
 }
 
 var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Scan AWS network infrastructure",
 	Long: `Scan your AWS network infrastructure and generate a visual representation
-of VPCs, subnets, peering connections, Transit Gateways, and related resources.`,
+of VPCs, subnets, peering connections, Transit Gateways, IAM roles and policies, and related resources.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runScan(cmd.Context())
 	},
@@ -81,12 +81,13 @@ func runScan(ctx context.Context) error {
 	}
 	
 	if verbose {
-		fmt.Printf("Found %d VPCs, %d subnets, %d peering connections, %d transit gateways, %d security groups\n", 
+		fmt.Printf("Found %d VPCs, %d subnets, %d peering connections, %d transit gateways, %d security groups, %d IAM roles\n", 
 			len(network.VPCs), 
 			len(network.Subnets),
 			len(network.PeeringConnections),
 			len(network.TransitGateways),
-			len(network.SecurityGroups))
+			len(network.SecurityGroups),
+			len(network.IAMRoles))
 	}
 	
 	// Set default filename if save-state flag is used

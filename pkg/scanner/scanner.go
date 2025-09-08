@@ -3,11 +3,14 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/Yiu-Kelvin/pikaatools/pkg/aws"
 )
 
@@ -91,6 +94,13 @@ func (s *NetworkScanner) ScanNetwork(ctx context.Context, vpcID string) (*Networ
 		return nil, fmt.Errorf("failed to scan security groups: %w", err)
 	}
 	network.SecurityGroups = securityGroups
+
+	// Scan IAM roles
+	iamRoles, err := s.scanIAMRoles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan IAM roles: %w", err)
+	}
+	network.IAMRoles = iamRoles
 
 	// Update subnet types based on route tables
 	s.updateSubnetTypes(network)
@@ -650,6 +660,215 @@ func (s *NetworkScanner) updateVPCAssociations(network *Network) {
 
 // convertTags converts AWS tags to map[string]string
 func convertTags(tags []types.Tag) map[string]string {
+	result := make(map[string]string)
+	for _, tag := range tags {
+		if tag.Key != nil && tag.Value != nil {
+			result[*tag.Key] = *tag.Value
+		}
+	}
+	return result
+}
+
+// scanIAMRoles scans IAM roles and their attached policies
+func (s *NetworkScanner) scanIAMRoles(ctx context.Context) ([]IAMRole, error) {
+	// List all roles
+	listRolesInput := &iam.ListRolesInput{}
+	
+	var allRoles []iamTypes.Role
+	for {
+		result, err := s.client.IAM.ListRoles(ctx, listRolesInput)
+		if err != nil {
+			return nil, err
+		}
+		
+		allRoles = append(allRoles, result.Roles...)
+		
+		if !result.IsTruncated {
+			break
+		}
+		listRolesInput.Marker = result.Marker
+	}
+
+	var iamRoles []IAMRole
+	for _, role := range allRoles {
+		r := IAMRole{
+			ID:                   *role.RoleId,
+			Name:                 *role.RoleName,
+			Path:                 *role.Path,
+			Arn:                  *role.Arn,
+			CreateDate:           *role.CreateDate,
+			AssumeRolePolicyDocument: "",
+			MaxSessionDuration:   int32(3600), // Default
+		}
+		
+		if role.Description != nil {
+			r.Description = *role.Description
+		}
+		if role.MaxSessionDuration != nil {
+			r.MaxSessionDuration = *role.MaxSessionDuration
+		}
+		if role.AssumeRolePolicyDocument != nil {
+			decoded, err := url.QueryUnescape(*role.AssumeRolePolicyDocument)
+			if err == nil {
+				r.AssumeRolePolicyDocument = decoded
+			} else {
+				r.AssumeRolePolicyDocument = *role.AssumeRolePolicyDocument
+			}
+		}
+		
+		// Get role tags
+		r.Tags = convertIAMTags(role.Tags)
+		
+		// Get attached managed policies
+		attachedPolicies, err := s.getAttachedRolePolicies(ctx, *role.RoleName)
+		if err != nil {
+			// Log error but continue
+			continue
+		}
+		r.AttachedPolicies = attachedPolicies
+		
+		// Get inline policies
+		inlinePolicies, err := s.getInlineRolePolicies(ctx, *role.RoleName)
+		if err != nil {
+			// Log error but continue
+			continue
+		}
+		r.InlinePolicies = inlinePolicies
+		
+		iamRoles = append(iamRoles, r)
+	}
+
+	return iamRoles, nil
+}
+
+// getAttachedRolePolicies gets managed policies attached to a role
+func (s *NetworkScanner) getAttachedRolePolicies(ctx context.Context, roleName string) ([]IAMPolicy, error) {
+	input := &iam.ListAttachedRolePoliciesInput{
+		RoleName: &roleName,
+	}
+
+	result, err := s.client.IAM.ListAttachedRolePolicies(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies []IAMPolicy
+	for _, attachedPolicy := range result.AttachedPolicies {
+		// Get policy details
+		getPolicyInput := &iam.GetPolicyInput{
+			PolicyArn: attachedPolicy.PolicyArn,
+		}
+		
+		policyResult, err := s.client.IAM.GetPolicy(ctx, getPolicyInput)
+		if err != nil {
+			continue // Skip this policy if we can't get details
+		}
+		
+		policy := policyResult.Policy
+		p := IAMPolicy{
+			Arn:              *policy.Arn,
+			PolicyName:       *policy.PolicyName,
+			PolicyId:         *policy.PolicyId,
+			Path:             *policy.Path,
+			DefaultVersionId: *policy.DefaultVersionId,
+			IsAttachable:     policy.IsAttachable,
+			CreateDate:       *policy.CreateDate,
+			UpdateDate:       *policy.UpdateDate,
+		}
+		
+		if policy.Description != nil {
+			p.Description = *policy.Description
+		}
+		if policy.AttachmentCount != nil {
+			p.AttachmentCount = *policy.AttachmentCount
+		}
+		if policy.PermissionsBoundaryUsageCount != nil {
+			p.PermissionsBoundaryUsageCount = *policy.PermissionsBoundaryUsageCount
+		}
+		
+		// Get policy tags
+		p.Tags = convertIAMTags(policy.Tags)
+		
+		// Get policy document
+		policyDocument, err := s.getPolicyDocument(ctx, *policy.Arn, *policy.DefaultVersionId)
+		if err == nil {
+			p.PolicyDocument = policyDocument
+		}
+		
+		policies = append(policies, p)
+	}
+
+	return policies, nil
+}
+
+// getInlineRolePolicies gets inline policies for a role
+func (s *NetworkScanner) getInlineRolePolicies(ctx context.Context, roleName string) ([]IAMInlinePolicy, error) {
+	input := &iam.ListRolePoliciesInput{
+		RoleName: &roleName,
+	}
+
+	result, err := s.client.IAM.ListRolePolicies(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies []IAMInlinePolicy
+	for _, policyName := range result.PolicyNames {
+		// Get policy document
+		getPolicyInput := &iam.GetRolePolicyInput{
+			RoleName:   &roleName,
+			PolicyName: &policyName,
+		}
+		
+		policyResult, err := s.client.IAM.GetRolePolicy(ctx, getPolicyInput)
+		if err != nil {
+			continue // Skip this policy if we can't get the document
+		}
+		
+		p := IAMInlinePolicy{
+			PolicyName: policyName,
+		}
+		
+		if policyResult.PolicyDocument != nil {
+			decoded, err := url.QueryUnescape(*policyResult.PolicyDocument)
+			if err == nil {
+				p.PolicyDocument = decoded
+			} else {
+				p.PolicyDocument = *policyResult.PolicyDocument
+			}
+		}
+		
+		policies = append(policies, p)
+	}
+
+	return policies, nil
+}
+
+// getPolicyDocument gets the policy document for a specific version
+func (s *NetworkScanner) getPolicyDocument(ctx context.Context, policyArn, versionId string) (string, error) {
+	input := &iam.GetPolicyVersionInput{
+		PolicyArn: &policyArn,
+		VersionId: &versionId,
+	}
+
+	result, err := s.client.IAM.GetPolicyVersion(ctx, input)
+	if err != nil {
+		return "", err
+	}
+
+	if result.PolicyVersion.Document != nil {
+		decoded, err := url.QueryUnescape(*result.PolicyVersion.Document)
+		if err != nil {
+			return *result.PolicyVersion.Document, nil
+		}
+		return decoded, nil
+	}
+
+	return "", nil
+}
+
+// convertIAMTags converts IAM tags to map[string]string
+func convertIAMTags(tags []iamTypes.Tag) map[string]string {
 	result := make(map[string]string)
 	for _, tag := range tags {
 		if tag.Key != nil && tag.Value != nil {
