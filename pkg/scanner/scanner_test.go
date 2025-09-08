@@ -134,3 +134,108 @@ func TestConvertIAMTags(t *testing.T) {
 		t.Errorf("Expected empty tags map, got %d items", len(tags))
 	}
 }
+
+func TestSecurityGroupRuleStructure(t *testing.T) {
+	// Test SecurityGroupRule structure
+	rule := SecurityGroupRule{
+		IpProtocol:                 "tcp",
+		FromPort:                   80,
+		ToPort:                     80,
+		CidrBlocks:                 []string{"0.0.0.0/0"},
+		Ipv6CidrBlocks:             []string{"::/0"},
+		PrefixListIds:              []string{"pl-12345"},
+		ReferencedGroupId:          "sg-12345",
+		ReferencedGroupOwnerId:     "123456789012",
+		Description:                "Allow HTTP traffic",
+		Tags:                       map[string]string{"Name": "HTTP rule"},
+	}
+	
+	if rule.IpProtocol != "tcp" {
+		t.Errorf("Expected protocol 'tcp', got %s", rule.IpProtocol)
+	}
+	
+	if rule.FromPort != 80 {
+		t.Errorf("Expected from port 80, got %d", rule.FromPort)
+	}
+	
+	if rule.ToPort != 80 {
+		t.Errorf("Expected to port 80, got %d", rule.ToPort)
+	}
+	
+	if len(rule.CidrBlocks) != 1 || rule.CidrBlocks[0] != "0.0.0.0/0" {
+		t.Error("Expected CIDR block '0.0.0.0/0'")
+	}
+	
+	if rule.Description != "Allow HTTP traffic" {
+		t.Errorf("Expected description 'Allow HTTP traffic', got %s", rule.Description)
+	}
+}
+
+func TestSecurityGroupWithRules(t *testing.T) {
+	// Test SecurityGroup with rules
+	sg := SecurityGroup{
+		ID:          "sg-12345",
+		Name:        "test-sg",
+		Description: "Test security group",
+		VpcID:       "vpc-12345",
+		Tags:        map[string]string{"Name": "test-sg"},
+		IngressRules: []SecurityGroupRule{
+			{
+				IpProtocol: "tcp",
+				FromPort:   80,
+				ToPort:     80,
+				CidrBlocks: []string{"0.0.0.0/0"},
+			},
+		},
+		EgressRules: []SecurityGroupRule{
+			{
+				IpProtocol: "tcp",
+				FromPort:   443,
+				ToPort:     443,
+				CidrBlocks: []string{"0.0.0.0/0"},
+			},
+		},
+	}
+	
+	if sg.ID != "sg-12345" {
+		t.Errorf("Expected SG ID 'sg-12345', got %s", sg.ID)
+	}
+	
+	if len(sg.IngressRules) != 1 {
+		t.Errorf("Expected 1 ingress rule, got %d", len(sg.IngressRules))
+	}
+	
+	if len(sg.EgressRules) != 1 {
+		t.Errorf("Expected 1 egress rule, got %d", len(sg.EgressRules))
+	}
+	
+	if sg.IngressRules[0].FromPort != 80 {
+		t.Errorf("Expected ingress rule port 80, got %d", sg.IngressRules[0].FromPort)
+	}
+	
+	if sg.EgressRules[0].FromPort != 443 {
+		t.Errorf("Expected egress rule port 443, got %d", sg.EgressRules[0].FromPort)
+	}
+}
+
+func TestNetworkScannerVerbose(t *testing.T) {
+	// Test that NetworkScanner can toggle verbose mode
+	scanner := &NetworkScanner{
+		client:  nil, // Not testing actual scanning, just the verbose flag
+		verbose: false,
+	}
+	
+	if scanner.verbose {
+		t.Error("Expected verbose to be false by default")
+	}
+	
+	scanner.SetVerbose(true)
+	if !scanner.verbose {
+		t.Error("Expected verbose to be true after setting")
+	}
+	
+	scanner.SetVerbose(false)
+	if scanner.verbose {
+		t.Error("Expected verbose to be false after setting")
+	}
+}

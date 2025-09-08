@@ -16,14 +16,21 @@ import (
 
 // NetworkScanner scans AWS network infrastructure
 type NetworkScanner struct {
-	client *aws.Client
+	client  *aws.Client
+	verbose bool
 }
 
 // NewNetworkScanner creates a new network scanner
 func NewNetworkScanner(client *aws.Client) *NetworkScanner {
 	return &NetworkScanner{
-		client: client,
+		client:  client,
+		verbose: false,
 	}
+}
+
+// SetVerbose enables or disables verbose output
+func (s *NetworkScanner) SetVerbose(verbose bool) {
+	s.verbose = verbose
 }
 
 // ScanNetwork scans the complete network infrastructure
@@ -34,11 +41,16 @@ func (s *NetworkScanner) ScanNetwork(ctx context.Context, vpcID string) (*Networ
 	}
 
 	// Scan VPCs
+	start := time.Now()
 	vpcs, err := s.scanVPCs(ctx, vpcID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan VPCs: %w", err)
 	}
 	network.VPCs = vpcs
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d VPCs took %v\n", len(vpcs), duration)
+	}
 
 	// Get VPC IDs for filtering other resources
 	vpcIDs := make([]string, len(vpcs))
@@ -47,60 +59,100 @@ func (s *NetworkScanner) ScanNetwork(ctx context.Context, vpcID string) (*Networ
 	}
 
 	// Scan subnets
+	start = time.Now()
 	subnets, err := s.scanSubnets(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan subnets: %w", err)
 	}
 	network.Subnets = subnets
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d subnets took %v\n", len(subnets), duration)
+	}
 
 	// Scan peering connections
+	start = time.Now()
 	peeringConnections, err := s.scanPeeringConnections(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan peering connections: %w", err)
 	}
 	network.PeeringConnections = peeringConnections
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d peering connections took %v\n", len(peeringConnections), duration)
+	}
 
 	// Scan transit gateways
+	start = time.Now()
 	transitGateways, err := s.scanTransitGateways(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan transit gateways: %w", err)
 	}
 	network.TransitGateways = transitGateways
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d transit gateways took %v\n", len(transitGateways), duration)
+	}
 
 	// Scan internet gateways
+	start = time.Now()
 	internetGateways, err := s.scanInternetGateways(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan internet gateways: %w", err)
 	}
 	network.InternetGateways = internetGateways
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d internet gateways took %v\n", len(internetGateways), duration)
+	}
 
 	// Scan NAT gateways
+	start = time.Now()
 	natGateways, err := s.scanNATGateways(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan NAT gateways: %w", err)
 	}
 	network.NATGateways = natGateways
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d NAT gateways took %v\n", len(natGateways), duration)
+	}
 
 	// Scan route tables
+	start = time.Now()
 	routeTables, err := s.scanRouteTables(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan route tables: %w", err)
 	}
 	network.RouteTables = routeTables
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d route tables took %v\n", len(routeTables), duration)
+	}
 
 	// Scan security groups
+	start = time.Now()
 	securityGroups, err := s.scanSecurityGroups(ctx, vpcIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan security groups: %w", err)
 	}
 	network.SecurityGroups = securityGroups
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d security groups took %v\n", len(securityGroups), duration)
+	}
 
 	// Scan IAM roles
+	start = time.Now()
 	iamRoles, err := s.scanIAMRoles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan IAM roles: %w", err)
 	}
 	network.IAMRoles = iamRoles
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d IAM roles took %v\n", len(iamRoles), duration)
+	}
 
 	// Update subnet types based on route tables
 	s.updateSubnetTypes(network)
@@ -126,6 +178,8 @@ func (s *NetworkScanner) scanVPCs(ctx context.Context, vpcID string) ([]VPC, err
 
 	var vpcs []VPC
 	for _, vpc := range result.Vpcs {
+		start := time.Now()
+		
 		v := VPC{
 			ID:            *vpc.VpcId,
 			CidrBlock:     *vpc.CidrBlock,
@@ -141,6 +195,11 @@ func (s *NetworkScanner) scanVPCs(ctx context.Context, vpcID string) ([]VPC, err
 		}
 		
 		vpcs = append(vpcs, v)
+		
+		if s.verbose {
+			duration := time.Since(start)
+			fmt.Printf("Scanned vpc %s took %v\n", v.ID, duration)
+		}
 	}
 
 	return vpcs, nil
@@ -508,7 +567,7 @@ func (s *NetworkScanner) scanRouteTables(ctx context.Context, vpcIDs []string) (
 	return routeTables, nil
 }
 
-// scanSecurityGroups scans security groups
+// scanSecurityGroups scans security groups and their rules
 func (s *NetworkScanner) scanSecurityGroups(ctx context.Context, vpcIDs []string) ([]SecurityGroup, error) {
 	if len(vpcIDs) == 0 {
 		return []SecurityGroup{}, nil
@@ -537,7 +596,107 @@ func (s *NetworkScanner) scanSecurityGroups(ctx context.Context, vpcIDs []string
 			VpcID:       *sg.VpcId,
 			Tags:        convertTags(sg.Tags),
 		}
-		
+
+		// Convert ingress rules
+		for _, rule := range sg.IpPermissions {
+			sgRule := SecurityGroupRule{
+				IpProtocol: *rule.IpProtocol,
+			}
+
+			if rule.FromPort != nil {
+				sgRule.FromPort = *rule.FromPort
+			}
+			if rule.ToPort != nil {
+				sgRule.ToPort = *rule.ToPort
+			}
+
+			// Convert IP ranges
+			for _, ipRange := range rule.IpRanges {
+				if ipRange.CidrIp != nil {
+					sgRule.CidrBlocks = append(sgRule.CidrBlocks, *ipRange.CidrIp)
+				}
+			}
+
+			// Convert IPv6 ranges
+			for _, ipv6Range := range rule.Ipv6Ranges {
+				if ipv6Range.CidrIpv6 != nil {
+					sgRule.Ipv6CidrBlocks = append(sgRule.Ipv6CidrBlocks, *ipv6Range.CidrIpv6)
+				}
+			}
+
+			// Convert prefix lists
+			for _, prefixList := range rule.PrefixListIds {
+				if prefixList.PrefixListId != nil {
+					sgRule.PrefixListIds = append(sgRule.PrefixListIds, *prefixList.PrefixListId)
+				}
+			}
+
+			// Convert user ID group pairs (referenced security groups)
+			for _, userIdGroupPair := range rule.UserIdGroupPairs {
+				if userIdGroupPair.GroupId != nil {
+					sgRule.ReferencedGroupId = *userIdGroupPair.GroupId
+				}
+				if userIdGroupPair.UserId != nil {
+					sgRule.ReferencedGroupOwnerId = *userIdGroupPair.UserId
+				}
+				if userIdGroupPair.Description != nil {
+					sgRule.Description = *userIdGroupPair.Description
+				}
+			}
+
+			s.IngressRules = append(s.IngressRules, sgRule)
+		}
+
+		// Convert egress rules
+		for _, rule := range sg.IpPermissionsEgress {
+			sgRule := SecurityGroupRule{
+				IpProtocol: *rule.IpProtocol,
+			}
+
+			if rule.FromPort != nil {
+				sgRule.FromPort = *rule.FromPort
+			}
+			if rule.ToPort != nil {
+				sgRule.ToPort = *rule.ToPort
+			}
+
+			// Convert IP ranges
+			for _, ipRange := range rule.IpRanges {
+				if ipRange.CidrIp != nil {
+					sgRule.CidrBlocks = append(sgRule.CidrBlocks, *ipRange.CidrIp)
+				}
+			}
+
+			// Convert IPv6 ranges
+			for _, ipv6Range := range rule.Ipv6Ranges {
+				if ipv6Range.CidrIpv6 != nil {
+					sgRule.Ipv6CidrBlocks = append(sgRule.Ipv6CidrBlocks, *ipv6Range.CidrIpv6)
+				}
+			}
+
+			// Convert prefix lists
+			for _, prefixList := range rule.PrefixListIds {
+				if prefixList.PrefixListId != nil {
+					sgRule.PrefixListIds = append(sgRule.PrefixListIds, *prefixList.PrefixListId)
+				}
+			}
+
+			// Convert user ID group pairs (referenced security groups)
+			for _, userIdGroupPair := range rule.UserIdGroupPairs {
+				if userIdGroupPair.GroupId != nil {
+					sgRule.ReferencedGroupId = *userIdGroupPair.GroupId
+				}
+				if userIdGroupPair.UserId != nil {
+					sgRule.ReferencedGroupOwnerId = *userIdGroupPair.UserId
+				}
+				if userIdGroupPair.Description != nil {
+					sgRule.Description = *userIdGroupPair.Description
+				}
+			}
+
+			s.EgressRules = append(s.EgressRules, sgRule)
+		}
+
 		securityGroups = append(securityGroups, s)
 	}
 

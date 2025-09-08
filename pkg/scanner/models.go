@@ -124,11 +124,27 @@ type Route struct {
 
 // SecurityGroup represents an AWS security group
 type SecurityGroup struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	VpcID       string            `json:"vpc_id"`
-	Tags        map[string]string `json:"tags"`
+	ID           string                `json:"id"`
+	Name         string                `json:"name"`
+	Description  string                `json:"description"`
+	VpcID        string                `json:"vpc_id"`
+	Tags         map[string]string     `json:"tags"`
+	IngressRules []SecurityGroupRule   `json:"ingress_rules"`
+	EgressRules  []SecurityGroupRule   `json:"egress_rules"`
+}
+
+// SecurityGroupRule represents an AWS security group rule
+type SecurityGroupRule struct {
+	IpProtocol                 string            `json:"ip_protocol"`
+	FromPort                   int32             `json:"from_port"`
+	ToPort                     int32             `json:"to_port"`
+	CidrBlocks                 []string          `json:"cidr_blocks"`
+	Ipv6CidrBlocks             []string          `json:"ipv6_cidr_blocks"`
+	PrefixListIds              []string          `json:"prefix_list_ids"`
+	ReferencedGroupId          string            `json:"referenced_group_id"`
+	ReferencedGroupOwnerId     string            `json:"referenced_group_owner_id"`
+	Description                string            `json:"description"`
+	Tags                       map[string]string `json:"tags"`
 }
 
 // IAMRole represents an AWS IAM role
