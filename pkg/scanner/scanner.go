@@ -142,6 +142,18 @@ func (s *NetworkScanner) ScanNetwork(ctx context.Context, vpcID string) (*Networ
 		fmt.Printf("Scanned %d security groups took %v\n", len(securityGroups), duration)
 	}
 
+	// Scan network ACLs
+	start = time.Now()
+	networkAcls, err := s.scanNetworkAcls(ctx, vpcIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan network ACLs: %w", err)
+	}
+	network.NetworkAcls = networkAcls
+	if s.verbose {
+		duration := time.Since(start)
+		fmt.Printf("Scanned %d network ACLs took %v\n", len(networkAcls), duration)
+	}
+
 	// Scan IAM roles
 	start = time.Now()
 	iamRoles, err := s.scanIAMRoles(ctx)
@@ -703,6 +715,88 @@ func (s *NetworkScanner) scanSecurityGroups(ctx context.Context, vpcIDs []string
 	return securityGroups, nil
 }
 
+// scanNetworkAcls scans network ACLs and their entries
+func (s *NetworkScanner) scanNetworkAcls(ctx context.Context, vpcIDs []string) ([]NetworkAcl, error) {
+	if len(vpcIDs) == 0 {
+		return []NetworkAcl{}, nil
+	}
+
+	input := &ec2.DescribeNetworkAclsInput{
+		Filters: []types.Filter{
+			{
+				Name:   &[]string{"vpc-id"}[0],
+				Values: vpcIDs,
+			},
+		},
+	}
+
+	result, err := s.client.EC2.DescribeNetworkAcls(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var networkAcls []NetworkAcl
+	for _, nacl := range result.NetworkAcls {
+		n := NetworkAcl{
+			ID:        *nacl.NetworkAclId,
+			VpcID:     *nacl.VpcId,
+			IsDefault: nacl.IsDefault != nil && *nacl.IsDefault,
+			Tags:      convertTags(nacl.Tags),
+		}
+
+		// Get name from tags
+		if name, ok := n.Tags["Name"]; ok {
+			n.Name = name
+		}
+
+		// Get associations (subnet IDs)
+		for _, assoc := range nacl.Associations {
+			if assoc.SubnetId != nil {
+				n.Associations = append(n.Associations, *assoc.SubnetId)
+			}
+		}
+
+		// Convert entries
+		for _, entry := range nacl.Entries {
+			e := NetworkAclEntry{
+				RuleNumber: *entry.RuleNumber,
+				Protocol:   *entry.Protocol,
+				RuleAction: string(entry.RuleAction),
+				Egress:     entry.Egress != nil && *entry.Egress,
+			}
+
+			if entry.CidrBlock != nil {
+				e.CidrBlock = *entry.CidrBlock
+			}
+			if entry.Ipv6CidrBlock != nil {
+				e.Ipv6CidrBlock = *entry.Ipv6CidrBlock
+			}
+
+			// Handle port range
+			if entry.PortRange != nil {
+				e.PortRange = &NetworkAclPortRange{
+					From: *entry.PortRange.From,
+					To:   *entry.PortRange.To,
+				}
+			}
+
+			// Handle ICMP type
+			if entry.IcmpTypeCode != nil {
+				e.IcmpType = &NetworkAclIcmpType{
+					Type: *entry.IcmpTypeCode.Type,
+					Code: *entry.IcmpTypeCode.Code,
+				}
+			}
+
+			n.Entries = append(n.Entries, e)
+		}
+
+		networkAcls = append(networkAcls, n)
+	}
+
+	return networkAcls, nil
+}
+
 // updateSubnetTypes determines subnet types based on route tables
 func (s *NetworkScanner) updateSubnetTypes(network *Network) {
 	// Create a map of route table ID to route table
@@ -711,9 +805,22 @@ func (s *NetworkScanner) updateSubnetTypes(network *Network) {
 		routeTableMap[network.RouteTables[i].ID] = &network.RouteTables[i]
 	}
 	
+	// Create a map of subnet ID to Network ACL ID
+	subnetToNaclMap := make(map[string]string)
+	for _, nacl := range network.NetworkAcls {
+		for _, subnetID := range nacl.Associations {
+			subnetToNaclMap[subnetID] = nacl.ID
+		}
+	}
+	
 	// Update each subnet
 	for i := range network.Subnets {
 		subnet := &network.Subnets[i]
+		
+		// Set Network ACL association
+		if naclID, exists := subnetToNaclMap[subnet.ID]; exists {
+			subnet.NetworkAclID = naclID
+		}
 		
 		// Find route table for this subnet
 		var routeTable *RouteTable
@@ -813,6 +920,13 @@ func (s *NetworkScanner) updateVPCAssociations(network *Network) {
 	for _, sg := range network.SecurityGroups {
 		if vpc, exists := vpcMap[sg.VpcID]; exists {
 			vpc.SecurityGroups = append(vpc.SecurityGroups, sg.ID)
+		}
+	}
+	
+	// Associate network ACLs with VPCs
+	for _, nacl := range network.NetworkAcls {
+		if vpc, exists := vpcMap[nacl.VpcID]; exists {
+			vpc.NetworkAcls = append(vpc.NetworkAcls, nacl.ID)
 		}
 	}
 }

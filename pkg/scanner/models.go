@@ -14,6 +14,7 @@ type Network struct {
 	NATGateways         []NATGateway          `json:"nat_gateways"`
 	RouteTables         []RouteTable          `json:"route_tables"`
 	SecurityGroups      []SecurityGroup       `json:"security_groups"`
+	NetworkAcls         []NetworkAcl          `json:"network_acls"`
 	IAMRoles            []IAMRole             `json:"iam_roles"`
 	ScanTime            time.Time             `json:"scan_time"`
 	Region              string                `json:"region"`
@@ -32,6 +33,7 @@ type VPC struct {
 	SecurityGroups    []string          `json:"security_groups"`    // Security Group IDs
 	InternetGateways  []string          `json:"internet_gateways"`  // Internet Gateway IDs
 	NATGateways       []string          `json:"nat_gateways"`       // NAT Gateway IDs
+	NetworkAcls       []string          `json:"network_acls"`       // Network ACL IDs
 }
 
 // Subnet represents an AWS subnet
@@ -45,6 +47,7 @@ type Subnet struct {
 	MapPublicIP       bool              `json:"map_public_ip"`
 	Tags              map[string]string `json:"tags"`
 	RouteTableID      string            `json:"route_table_id"`
+	NetworkAclID      string            `json:"network_acl_id"`
 	Type              string            `json:"type"` // "public", "private", "isolated"
 }
 
@@ -183,4 +186,39 @@ type IAMPolicy struct {
 type IAMInlinePolicy struct {
 	PolicyName     string `json:"policy_name"`
 	PolicyDocument string `json:"policy_document"`
+}
+
+// NetworkAcl represents an AWS Network ACL
+type NetworkAcl struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	VpcID        string            `json:"vpc_id"`
+	IsDefault    bool              `json:"is_default"`
+	Tags         map[string]string `json:"tags"`
+	Entries      []NetworkAclEntry `json:"entries"`
+	Associations []string          `json:"associations"` // Subnet IDs
+}
+
+// NetworkAclEntry represents an entry in a Network ACL
+type NetworkAclEntry struct {
+	RuleNumber   int32  `json:"rule_number"`
+	Protocol     string `json:"protocol"`
+	RuleAction   string `json:"rule_action"`
+	CidrBlock    string `json:"cidr_block"`
+	Ipv6CidrBlock string `json:"ipv6_cidr_block"`
+	PortRange    *NetworkAclPortRange `json:"port_range,omitempty"`
+	IcmpType     *NetworkAclIcmpType  `json:"icmp_type,omitempty"`
+	Egress       bool   `json:"egress"`
+}
+
+// NetworkAclPortRange represents a port range in a Network ACL entry
+type NetworkAclPortRange struct {
+	From int32 `json:"from"`
+	To   int32 `json:"to"`
+}
+
+// NetworkAclIcmpType represents ICMP type and code in a Network ACL entry
+type NetworkAclIcmpType struct {
+	Type int32 `json:"type"`
+	Code int32 `json:"code"`
 }

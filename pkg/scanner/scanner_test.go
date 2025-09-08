@@ -239,3 +239,118 @@ func TestNetworkScannerVerbose(t *testing.T) {
 		t.Error("Expected verbose to be false after setting")
 	}
 }
+
+func TestNetworkAclStructure(t *testing.T) {
+	// Test NetworkAcl structure
+	nacl := NetworkAcl{
+		ID:        "acl-12345",
+		Name:      "test-nacl",
+		VpcID:     "vpc-12345",
+		IsDefault: false,
+		Tags:      map[string]string{"Environment": "test"},
+		Entries: []NetworkAclEntry{
+			{
+				RuleNumber: 100,
+				Protocol:   "tcp",
+				RuleAction: "allow",
+				CidrBlock:  "10.0.0.0/16",
+				PortRange: &NetworkAclPortRange{
+					From: 80,
+					To:   80,
+				},
+				Egress: false,
+			},
+		},
+		Associations: []string{"subnet-12345"},
+	}
+	
+	if nacl.ID != "acl-12345" {
+		t.Errorf("Expected NACL ID 'acl-12345', got %s", nacl.ID)
+	}
+	
+	if nacl.IsDefault {
+		t.Error("Expected IsDefault to be false")
+	}
+	
+	if len(nacl.Entries) != 1 {
+		t.Errorf("Expected 1 entry, got %d", len(nacl.Entries))
+	}
+	
+	entry := nacl.Entries[0]
+	if entry.RuleNumber != 100 {
+		t.Errorf("Expected rule number 100, got %d", entry.RuleNumber)
+	}
+	
+	if entry.Protocol != "tcp" {
+		t.Errorf("Expected protocol 'tcp', got %s", entry.Protocol)
+	}
+	
+	if entry.RuleAction != "allow" {
+		t.Errorf("Expected rule action 'allow', got %s", entry.RuleAction)
+	}
+	
+	if entry.PortRange == nil {
+		t.Error("Expected port range to be set")
+	} else if entry.PortRange.From != 80 || entry.PortRange.To != 80 {
+		t.Errorf("Expected port range 80-80, got %d-%d", entry.PortRange.From, entry.PortRange.To)
+	}
+	
+	if entry.Egress {
+		t.Error("Expected egress to be false")
+	}
+	
+	if len(nacl.Associations) != 1 || nacl.Associations[0] != "subnet-12345" {
+		t.Error("Expected association with subnet-12345")
+	}
+}
+
+func TestNetworkAclEntryWithIcmp(t *testing.T) {
+	// Test NetworkAclEntry with ICMP type
+	entry := NetworkAclEntry{
+		RuleNumber: 200,
+		Protocol:   "icmp",
+		RuleAction: "allow",
+		CidrBlock:  "0.0.0.0/0",
+		IcmpType: &NetworkAclIcmpType{
+			Type: 8,
+			Code: 0,
+		},
+		Egress: true,
+	}
+	
+	if entry.Protocol != "icmp" {
+		t.Errorf("Expected protocol 'icmp', got %s", entry.Protocol)
+	}
+	
+	if entry.IcmpType == nil {
+		t.Error("Expected ICMP type to be set")
+	} else if entry.IcmpType.Type != 8 || entry.IcmpType.Code != 0 {
+		t.Errorf("Expected ICMP type 8 code 0, got type %d code %d", entry.IcmpType.Type, entry.IcmpType.Code)
+	}
+	
+	if !entry.Egress {
+		t.Error("Expected egress to be true")
+	}
+}
+
+func TestNetworkWithNacls(t *testing.T) {
+	// Test Network structure includes NetworkAcls
+	network := &Network{
+		NetworkAcls: []NetworkAcl{
+			{
+				ID:    "acl-12345",
+				VpcID: "vpc-12345",
+			},
+		},
+		ScanTime: time.Now(),
+		Region:   "us-east-1",
+	}
+	
+	if len(network.NetworkAcls) != 1 {
+		t.Errorf("Expected 1 Network ACL, got %d", len(network.NetworkAcls))
+	}
+	
+	if network.NetworkAcls[0].ID != "acl-12345" {
+		t.Errorf("Expected Network ACL ID 'acl-12345', got %s", network.NetworkAcls[0].ID)
+	}
+}

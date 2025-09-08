@@ -82,12 +82,13 @@ func runScan(ctx context.Context) error {
 	}
 	
 	if verbose {
-		fmt.Printf("Found %d VPCs, %d subnets, %d peering connections, %d transit gateways, %d security groups, %d IAM roles\n", 
+		fmt.Printf("Found %d VPCs, %d subnets, %d peering connections, %d transit gateways, %d security groups, %d network ACLs, %d IAM roles\n", 
 			len(network.VPCs), 
 			len(network.Subnets),
 			len(network.PeeringConnections),
 			len(network.TransitGateways),
 			len(network.SecurityGroups),
+			len(network.NetworkAcls),
 			len(network.IAMRoles))
 	}
 	
