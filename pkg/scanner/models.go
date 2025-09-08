@@ -14,6 +14,7 @@ type Network struct {
 	NATGateways         []NATGateway          `json:"nat_gateways"`
 	RouteTables         []RouteTable          `json:"route_tables"`
 	SecurityGroups      []SecurityGroup       `json:"security_groups"`
+	IAMRoles            []IAMRole             `json:"iam_roles"`
 	ScanTime            time.Time             `json:"scan_time"`
 	Region              string                `json:"region"`
 }
@@ -128,4 +129,42 @@ type SecurityGroup struct {
 	Description string            `json:"description"`
 	VpcID       string            `json:"vpc_id"`
 	Tags        map[string]string `json:"tags"`
+}
+
+// IAMRole represents an AWS IAM role
+type IAMRole struct {
+	ID                   string              `json:"id"`
+	Name                 string              `json:"name"`
+	Path                 string              `json:"path"`
+	Arn                  string              `json:"arn"`
+	Description          string              `json:"description"`
+	CreateDate           time.Time           `json:"create_date"`
+	AssumeRolePolicyDocument string         `json:"assume_role_policy_document"`
+	MaxSessionDuration   int32               `json:"max_session_duration"`
+	Tags                 map[string]string   `json:"tags"`
+	AttachedPolicies     []IAMPolicy         `json:"attached_policies"`
+	InlinePolicies       []IAMInlinePolicy   `json:"inline_policies"`
+}
+
+// IAMPolicy represents an AWS IAM policy (managed policy)
+type IAMPolicy struct {
+	Arn                    string            `json:"arn"`
+	PolicyName             string            `json:"policy_name"`
+	PolicyId               string            `json:"policy_id"`
+	Path                   string            `json:"path"`
+	DefaultVersionId       string            `json:"default_version_id"`
+	AttachmentCount        int32             `json:"attachment_count"`
+	PermissionsBoundaryUsageCount int32     `json:"permissions_boundary_usage_count"`
+	IsAttachable           bool              `json:"is_attachable"`
+	Description            string            `json:"description"`
+	CreateDate             time.Time         `json:"create_date"`
+	UpdateDate             time.Time         `json:"update_date"`
+	Tags                   map[string]string `json:"tags"`
+	PolicyDocument         string            `json:"policy_document"`
+}
+
+// IAMInlinePolicy represents an inline policy attached to a role
+type IAMInlinePolicy struct {
+	PolicyName     string `json:"policy_name"`
+	PolicyDocument string `json:"policy_document"`
 }
